@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digital Thread Wing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a control-room canvas. The customer frames the process at top; one wing travels a cyan thread through five company views, carried by a data object that changes form at each view and returns as feedback. Layers (systems, change, feedback) can be switched on and off for the workshop. Single dark theme by choice. */
+:root{
+  --ink:#070b17; --panel:#0d1426; --panel2:#131c33; --line:#26335a; --text:#e7eefb; --muted:#93a3c4;
+  --thread:#5ad1ff; --data:#a99aff; --change:#ffb347; --ok:#4fe3b5;
+  --display:'Sora','Segoe UI',system-ui,sans-serif;
+  --body:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--ink);color:var(--text);font:15px/1.5 var(--body);
+  background-image:
+    radial-gradient(900px 420px at 12% -8%,rgba(90,209,255,.13),transparent 60%),
+    radial-gradient(700px 420px at 100% 0,rgba(169,154,255,.10),transparent 60%),
+    linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:auto,auto,40px 40px,40px 40px;
+  background-repeat:no-repeat,no-repeat,repeat,repeat;min-height:100vh;
+}
+.wrap{max-width:1260px;margin:0 auto;padding:22px 20px 48px}
+header{display:flex;flex-wrap:wrap;gap:18px 32px;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+.eyebrow{font:500 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--thread)}
+h1{font:700 clamp(24px,3.4vw,38px)/1.12 var(--display);margin:8px 0 8px;text-wrap:balance}
+.sub{color:var(--muted);max-width:64ch;margin:0}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;color:inherit}
+.tab{background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:9px 14px;cursor:pointer;display:flex;gap:10px;align-items:center}
+.tab b{font:500 11px var(--mono);color:var(--thread)}
+.tab:hover{border-color:var(--thread);color:var(--text)}
+.tab[aria-current="page"]{border-color:var(--thread);color:var(--text);box-shadow:0 0 0 1px rgba(90,209,255,.35),0 0 24px rgba(90,209,255,.15)}
+:focus-visible{outline:2px solid var(--thread);outline-offset:2px}
+
+.scene{display:none}
+.scene.on{display:block}
+.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:14px}
+.bar{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center;margin:0 0 14px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 13px;cursor:pointer;font-size:14px}
+.btn:hover{border-color:var(--thread)}
+.btn.pri{border-color:var(--thread);color:var(--thread)}
+.org[aria-pressed="true"]{border-color:var(--change);color:var(--change)}
+.hint{color:var(--muted);font-size:13px}
+.toggles{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}
+.toggles span{font:500 10.5px var(--mono);letter-spacing:.12em;color:var(--muted);margin-right:4px}
+.tg{background:transparent;border:1px solid var(--line);border-radius:999px;padding:4px 12px;cursor:pointer;font:500 12px var(--mono);color:var(--muted)}
+.tg[aria-pressed="true"]{color:var(--text);border-color:#3b5288;background:var(--panel2)}
+.tg[aria-pressed="true"]::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--c,var(--thread));margin-right:7px;vertical-align:1px}
+.tg[aria-pressed="false"]{border-style:dashed}
+
+/* overview */
+.diagram{padding:10px;overflow-x:auto}
+#ov{display:block;width:100%;min-width:980px;height:auto}
+#ov .lbl{font:500 10.5px var(--mono);fill:var(--muted);letter-spacing:.07em}
+#ov .lbl.hi{fill:var(--text)}
+#ov .lbl.th{fill:var(--thread);font-size:9.5px;letter-spacing:.02em}
+#ov .lbl.am{fill:var(--change)}
+#ov .lbl.sm{font-size:9.5px;letter-spacing:.05em}
+#ov .sname{font:600 13.5px var(--display);fill:var(--text)}
+#ov .band{fill:rgba(255,255,255,.02);stroke:var(--line);stroke-dasharray:4 4}
+#ov .band.cust{fill:rgba(90,209,255,.06);stroke:var(--thread);stroke-dasharray:none}
+#ov .stem{stroke:var(--line);stroke-dasharray:2 4}
+#ov .clink{fill:none;stroke:var(--thread);stroke-width:1.5}
+#ov .stage{cursor:pointer}
+#ov .stage .cardbg{fill:var(--panel2);stroke:var(--line);stroke-width:1;transition:stroke .2s,fill .2s}
+#ov .stage:hover .cardbg{stroke:var(--thread)}
+#ov .stage.sel .cardbg{stroke:var(--thread);stroke-width:1.6;fill:#162342}
+#ov .stage:focus-visible{outline:none}
+#ov .stage:focus-visible .cardbg{stroke:var(--text);stroke-width:2}
+#ov .chip{fill:rgba(169,154,255,.12);stroke:rgba(169,154,255,.45)}
+#ov .chipt{font:500 10.5px var(--mono);fill:var(--data)}
+#ov .node{fill:var(--ink);stroke:var(--thread);stroke-width:1.6;transition:stroke-width .2s}
+#ov .stage.sel .node{fill:var(--thread)}
+#ov .stage.hot .node{stroke-width:3.2;filter:drop-shadow(0 0 7px var(--thread))}
+#ov .nodet{font:600 11px var(--mono);fill:var(--thread)}
+#ov .stage.sel .nodet{fill:var(--ink)}
+#ov .thr-base{stroke:var(--line);stroke-width:2}
+#ov .thr{stroke:var(--thread);stroke-width:2.2;stroke-dasharray:8 6;animation:flow 1.4s linear infinite}
+#ov .fbk{fill:none;stroke:var(--ok);stroke-width:1.8;stroke-dasharray:3 5;opacity:.75;animation:flow 2s linear infinite}
+#ov.loop .fbk{opacity:1;stroke-width:2.6}
+#ov .ecr{fill:#17182a;stroke:rgba(255,179,71,.45);stroke-width:.9}
+#ov .dia{fill:var(--change);opacity:.8}
+#ov .lbl.am2{fill:rgba(255,179,71,.8)}
+#ov .sband{fill:rgba(169,189,227,.08);stroke:currentColor;stroke-width:1.3}
+#ov .stt{font:600 10px var(--mono);fill:var(--text);letter-spacing:.02em}
+#ov .schip{fill:rgba(169,189,227,.14);stroke:currentColor;stroke-opacity:.6}
+#ov .sct{font:500 9px var(--mono);fill:currentColor;letter-spacing:.03em}
+#ov .slink{stroke:currentColor;stroke-width:1.8;fill:none}
+#ov .pmband{fill:#141c31;stroke:rgba(223,231,247,.42);stroke-width:1}
+#ov .pmchip{fill:#161f36;stroke:rgba(223,231,247,.28)}
+#ov .pmt{font:500 10.5px var(--mono);fill:var(--text);letter-spacing:.03em}
+#ov .lbase{fill:var(--panel)}
+#ov .lane{fill:currentColor;fill-opacity:.11;stroke:currentColor;stroke-opacity:.5}
+#ov .lane.link{fill-opacity:.03;stroke-opacity:.45;stroke-dasharray:4 4}
+#ov .lacc{fill:currentColor}
+#ov .lbadge{fill:currentColor;fill-opacity:.14;stroke:currentColor;stroke-opacity:.7}
+#ov .lic *{fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+#ov .lname{font:600 10px var(--mono);fill:var(--text);letter-spacing:-.02em}
+#ov .lanet{font:500 10.5px var(--mono);fill:var(--text)}
+#ov .band.cust{fill:url(#cg);stroke:var(--thread);stroke-width:1.4;stroke-dasharray:none}
+#ov .custt{font:700 15px var(--display);fill:var(--text);letter-spacing:.14em}
+#ov .acft{fill:var(--thread)}
+#ov .io{fill:none;stroke:var(--thread);stroke-width:3.2;stroke-dasharray:7 5;animation:flow 1s linear infinite;filter:drop-shadow(0 0 4px var(--thread))}
+#ov .iob{fill:var(--thread)}
+#ov .iot{font:700 11px var(--mono);fill:var(--ink);letter-spacing:.1em}
+#ov .lane.link + .lanet{fill:var(--muted)}
+#ov .layer{transition:opacity .35s}
+#ov.hide-sys #g-sys,#ov.hide-chg #g-chg,#ov.hide-fbk #g-fbk{opacity:.06}
+#ov .pk-dot{fill:var(--text);filter:drop-shadow(0 0 6px var(--thread))}
+#ov .pk-box{fill:var(--ink);stroke:var(--thread);stroke-width:1.2}
+#ov .pk-t{font:600 9.5px var(--mono);fill:var(--thread);letter-spacing:.04em}
+#ov .pk-lab{transition:transform .3s}
+#ov #pkt.back .pk-lab{transform:translateY(-40px)}
+#ov #pkt.back .pk-box{stroke:var(--ok)}
+#ov #pkt.back .pk-t{fill:var(--ok)}
+#ov #pkt.back .pk-dot{filter:drop-shadow(0 0 6px var(--ok))}
+#ov .w-out{fill:rgba(90,209,255,.08);stroke:var(--thread);stroke-width:1.4}
+#ov .w-out.dash{fill:none;stroke-dasharray:4 3}
+#ov .w-ghost{fill:none;stroke:var(--line);stroke-dasharray:3 3}
+#ov .w-sp{stroke:var(--thread);stroke-width:1;opacity:.75}
+#ov .w-rb{stroke:var(--thread);stroke-width:1;opacity:.45}
+#ov .w-dot{fill:var(--data)}
+#ov .w-ok{fill:none;stroke:var(--ok);stroke-width:1.2}
+#ov .w-sv{fill:none;stroke:var(--change);stroke-width:1.2;stroke-dasharray:2 2}
+@keyframes flow{to{stroke-dashoffset:-28}}
+.legend{display:flex;flex-wrap:wrap;gap:8px 22px;padding:2px 6px 8px;color:var(--muted);font-size:13px}
+.legend i{display:inline-block;width:22px;height:0;border-top:2px dashed;vertical-align:middle;margin-right:8px}
+.legend u{display:inline-block;text-decoration:none;font:600 9.5px var(--mono);color:var(--thread);border:1px solid var(--thread);border-radius:8px;padding:0 6px;margin-right:8px}
+
+.detail{margin-top:16px;padding:20px 22px}
+.dhead{display:flex;gap:16px;align-items:center;margin-bottom:6px}
+.num{font:600 28px var(--display);color:var(--thread)}
+.detail h2{font:600 22px var(--display);margin:0}
+.state{font:500 12px var(--mono);color:var(--thread);letter-spacing:.06em}
+.wingtxt{margin:8px 0 16px;max-width:78ch}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:18px}
+.dgrid h3{font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.dgrid p,.dgrid ul{margin:0;padding:0;list-style:none;font-size:14px}
+.dgrid li{padding:2px 0}
+.dgrid li::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--data);margin-right:9px;vertical-align:middle}
+.dgrid .an li::before{background:var(--change)}
+.go{margin-top:16px}
+
+/* production */
+.ribbon{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.rb{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 15px;cursor:pointer;font:500 13px var(--mono);color:var(--muted)}
+.rb.on{border-color:var(--thread);color:var(--thread);box-shadow:0 0 18px rgba(90,209,255,.18)}
+.rb.past{color:var(--text);border-color:#2f4b7a}
+.rsep{color:var(--line)}
+.pgrid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:860px){.pgrid{grid-template-columns:1fr}}
+.pane{padding:20px 22px}
+.pane h2{font:600 20px var(--display);margin:2px 0 4px}
+.pane .change{color:var(--text);margin:6px 0 14px;max-width:64ch}
+.pane h3,.split h3,.exch h3{font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.tag{font:500 10.5px var(--mono);letter-spacing:.06em;color:var(--data);border:1px solid rgba(169,154,255,.45);background:rgba(169,154,255,.1);border-radius:999px;padding:1px 8px;margin-left:8px;white-space:nowrap}
+.tag.ok{color:var(--ok);border-color:rgba(79,227,181,.5);background:rgba(79,227,181,.1)}
+.tag.am{color:var(--change);border-color:rgba(255,179,71,.5);background:rgba(255,179,71,.1)}
+.swap{animation:in .35s ease-out}
+@keyframes in{from{opacity:.15;transform:translateY(6px)}to{opacity:1;transform:none}}
+.tree,.tree ul{list-style:none;margin:0;padding:0}
+.tree ul{margin:2px 0 2px 6px;padding-left:16px;border-left:1px solid var(--line)}
+.tree li{position:relative;padding:3px 0}
+.tree ul>li::before{content:'';position:absolute;left:-16px;top:15px;width:12px;border-top:1px solid var(--line)}
+.tree li.off{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.tree li.off .tag{text-decoration:none}
+.tablewrap{overflow-x:auto}
+table.bop{border-collapse:collapse;width:100%;font-size:13.5px}
+.bop th{font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 10px;border-bottom:1px solid var(--line)}
+.bop td{padding:7px 10px;border-bottom:1px solid rgba(38,51,90,.6);vertical-align:top}
+.bop td:first-child{font-family:var(--mono);color:var(--thread)}
+.rows{list-style:none;margin:0;padding:0}
+.rows li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(38,51,90,.6);font-size:14px}
+.rows em{font-style:normal;color:var(--ok);text-align:right}
+.rows em.am{color:var(--change)}
+.rechd{font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:620px){.split{grid-template-columns:1fr}}
+.split .col{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.split .col.make{border-color:rgba(79,227,181,.5)}
+.split .col.buy{border-color:rgba(255,179,71,.5);border-style:dashed}
+.exch{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media(max-width:620px){.exch{grid-template-columns:1fr}}
+.exch p{margin:0;font-size:14px}
+.fmap{display:block;width:100%;height:auto;margin:6px 0 14px}
+.fn rect{fill:var(--panel);stroke:var(--line);transition:all .3s}
+.fn text{font:600 11px var(--display);fill:var(--muted);transition:fill .3s}
+.fn .s{font:500 9px var(--mono);letter-spacing:-.02em}
+.fn.sup rect{stroke-dasharray:4 3}
+.fn.on rect{stroke:var(--thread);fill:rgba(90,209,255,.09)}
+.fn.on text{fill:var(--text)}
+.fn.on .s{fill:var(--thread)}
+.fn.sup.on rect{stroke:var(--change);fill:rgba(255,179,71,.08)}
+.fn.sup.on .s{fill:var(--change)}
+.fe{fill:none;stroke:var(--line);stroke-width:1.4}
+.fe.on{stroke:var(--thread);stroke-dasharray:6 5;animation:flow 1.2s linear infinite}
+.fcap{font:500 8.5px var(--mono);fill:var(--muted);letter-spacing:.06em}
+.sys{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:10px 0 14px}
+.sb{border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:500 13px var(--mono);color:var(--muted);transition:all .25s}
+.sb small{display:block;font:400 11px var(--body);margin-top:2px}
+.sb.on{border-color:var(--thread);color:var(--thread);background:rgba(90,209,255,.07);box-shadow:0 0 18px rgba(90,209,255,.12)}
+.handoff{margin:0;color:var(--text);font-size:14px}
+
+/* product change management */
+.cgrid{padding:18px 20px}
+.phases{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 12px}
+.ph{border:1px solid var(--line);border-radius:999px;padding:6px 14px;font:500 12.5px var(--mono);color:var(--muted);transition:all .3s}
+.ph.act{border-color:var(--change);color:var(--change);background:rgba(255,179,71,.08);box-shadow:0 0 18px rgba(255,179,71,.18)}
+.ph.dn{border-color:#5b4a2a;color:var(--text)}
+.caption{min-height:3.2em;margin:0 0 6px;max-width:84ch}
+.railwrap{overflow-x:auto;padding:16px 0 6px}
+.strip,.rail{display:grid;grid-template-columns:repeat(5,minmax(176px,1fr));gap:12px;min-width:940px}
+.strip{position:relative;height:30px;margin-bottom:10px}
+.strip::before{content:'';position:absolute;left:10%;right:10%;top:50%;border-top:1px dashed var(--line)}
+.sd{position:relative;display:grid;place-items:center}
+.sd i{width:14px;height:14px;border-radius:50%;background:var(--ink);border:2px solid var(--thread);position:relative;z-index:1;transition:all .4s;transition-delay:var(--d,0ms)}
+.sd.origin i{border-color:var(--change);background:var(--change);box-shadow:0 0 14px var(--change)}
+.sd.hit i{border-color:var(--change);box-shadow:0 0 10px rgba(255,179,71,.5)}
+.sd.done i{border-color:var(--ok);background:var(--ok);box-shadow:0 0 10px rgba(79,227,181,.5)}
+.sd b{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid var(--change);opacity:0;left:50%;top:50%;margin:-7px 0 0 -7px;pointer-events:none}
+.strip.go .sd.origin b{animation:ring 1.8s ease-out infinite}
+.strip.go .sd.origin b:nth-of-type(2){animation-delay:.6s}
+.strip.go .sd.origin b:nth-of-type(3){animation-delay:1.2s}
+@keyframes ring{from{transform:scale(1);opacity:.9}to{transform:scale(6);opacity:0}}
+.vc{border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:var(--panel2);transition:border-color .4s,background .4s,box-shadow .4s;transition-delay:var(--d,0ms);min-height:190px;display:flex;flex-direction:column;gap:4px}
+.vc .vno{font:600 12px var(--mono);color:var(--thread)}
+.vc h4{font:600 14px var(--display);margin:0}
+.vc .vs{font:500 10.5px var(--mono);color:var(--muted);letter-spacing:.04em}
+.vc p{margin:6px 0 0;font-size:13.5px;flex:1}
+.vc .chip2{align-self:flex-start;font:500 10.5px var(--mono);border:1px solid var(--line);border-radius:999px;padding:1px 9px;color:var(--muted);min-height:20px}
+.vc.origin{border-color:var(--change);background:rgba(255,179,71,.08);box-shadow:0 0 22px rgba(255,179,71,.2)}
+.vc.hit{border-color:var(--change);background:rgba(255,179,71,.05)}
+.vc.hit .chip2,.vc.origin .chip2{color:var(--change);border-color:rgba(255,179,71,.5)}
+.vc.done{border-color:var(--ok);background:rgba(79,227,181,.06);box-shadow:none}
+.vc.done .chip2{color:var(--ok);border-color:rgba(79,227,181,.5)}
+.gov{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:14px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;opacity:.35;transition:opacity .4s,border-color .4s}
+.gov.on{opacity:1;border-color:var(--change);background:rgba(255,179,71,.05)}
+.gov b{font:500 10.5px var(--mono);letter-spacing:.12em;color:var(--change)}
+.gov .pill{border:1px solid rgba(255,179,71,.5);border-radius:999px;padding:1px 10px;font:500 12px var(--mono);color:var(--change)}
+.gov span:last-child{font-size:13.5px;flex:1;min-width:260px}
+.eff{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px;transition:opacity .4s}
+.eff.dim{opacity:.35}
+.eff div{border:1px dashed var(--ok);border-radius:10px;padding:9px 12px;font-size:13.5px}
+.eff b{display:block;font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ok);margin-bottom:2px}
+/* views selector, flow nodes, presenter */
+.vsel{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:8px;margin-bottom:14px;overflow-x:auto}
+.vb{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 12px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:1px}
+.vb b{font:600 11px var(--mono);color:var(--thread)}
+.vb span{font:600 13.5px/1.25 var(--display);color:var(--text)}
+.vb small{font:500 10px var(--mono);color:var(--muted)}
+.vb:hover{border-color:var(--thread)}
+.vb[aria-selected="true"]{border-color:var(--thread);background:#162342;box-shadow:0 0 0 1px rgba(90,209,255,.3),0 0 22px rgba(90,209,255,.14)}
+.rows em.mu{color:var(--muted)}
+.rows em.th{color:var(--thread)}
+.fn.cust rect{stroke-width:1.6}
+.fn.fb rect{stroke-dasharray:4 3}
+.fn.fb.on rect{stroke:var(--ok);fill:rgba(79,227,181,.08)}
+.fn.fb.on .s{fill:var(--ok)}
+.tab.pres{color:var(--thread);border-color:var(--thread)}
+.pbar{display:none;position:fixed;right:16px;bottom:14px;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 14px;font:500 12px var(--mono);color:var(--muted);z-index:10;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.pbar b{color:var(--thread);font-weight:600}
+.pbar .btn{padding:4px 12px;font-size:12px}
+.present .pbar{display:flex}
+.present .sub{display:none}
+.present .wrap{padding-top:14px}
+footer{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:space-between;color:var(--muted);font-size:13px}
+footer p{margin:0;max-width:78ch}
+@media (prefers-reduced-motion:reduce){
+  #ov .thr,#ov .fbk,#ov .io,.swap,.fe.on,.strip.go .sd.origin b{animation:none}
+  .vc,.sb,.ph,.sd i,.gov,#ov .layer{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Digital continuity · A&amp;D Tier-1 · Client workshop</div>
+      <h1>One configuration, many views, closed loop</h1>
+      <p class="sub">How one wing travels from customer requirement to a maintained aircraft section, and how a change travels back through every view.</p>
+    </div>
+    <nav class="tabs" aria-label="Scenes">
+      <button class="tab" id="t-overview" data-go="overview"><b>01</b>Overview</button>
+      <button class="tab" id="t-views" data-go="views"><b>02</b>Views</button>
+      <button class="tab" id="t-change" data-go="change"><b>03</b>Product Change Management</button>
+      <button class="tab pres" id="present" title="Full screen, arrow keys to move, Esc to exit">Present ▸</button>
+    </nav>
+  </header>
+
+  <!-- Scene 1 -->
+  <section class="scene" id="s-overview" aria-label="Overview">
+    <div class="bar">
+      <button class="btn pri" id="ov-play">Play the thread</button>
+      <span class="hint">Select a view to see what the wing is at that point.</span>
+      <div class="toggles" role="group" aria-label="Layers">
+        <span>LAYERS</span>
+        <button class="tg" data-layer="sys" aria-pressed="true" style="--c:var(--text)">Systems</button>
+        <button class="tg" data-layer="chg" aria-pressed="true" style="--c:var(--change)">Change</button>
+        <button class="tg" data-layer="fbk" aria-pressed="true" style="--c:var(--ok)">Feedback</button>
+      </div>
+    </div>
+    <div class="card diagram"><svg id="ov" viewBox="0 0 1200 706" role="img" aria-label="Customer, supply chain, five company views along the product thread, systems, change lane and feedback loop"></svg>
+      <div class="legend">
+        <span><u>eBOM · SW PARTS</u>Data object, changes form at each view</span>
+        <span><i style="color:var(--thread)"></i>Product thread and customer exchange</span>
+        <span><i style="color:var(--ok)"></i>As-built and as-maintained feedback</span>
+        <span><i style="color:var(--change)"></i>Change (ECR, ECO, ECN)</span>
+      </div>
+    </div>
+    <div class="card detail" id="detail" aria-live="polite"></div>
+  </section>
+
+  <!-- Scene 2 -->
+  <section class="scene" id="s-views" aria-label="Company views">
+    <div class="vsel" id="vsel" role="tablist" aria-label="Company views"></div>
+    <div class="bar">
+      <button class="btn pri" id="pr-play">Play the sequence</button>
+      <span class="hint" id="vhint"></span>
+    </div>
+    <div class="ribbon" id="ribbon"></div>
+    <div class="pgrid">
+      <div class="card pane" id="pr-main"></div>
+      <div class="card pane" id="pr-side"></div>
+    </div>
+  </section>
+
+  <!-- Scene 3 -->
+  <section class="scene" id="s-change" aria-label="Product Change Management">
+    <div class="bar">
+      <span class="hint">Where does the change start?</span>
+      <button class="btn org" data-origin="service" aria-pressed="true">Service finding</button>
+      <button class="btn org" data-origin="production" aria-pressed="false">Production nonconformance</button>
+      <button class="btn org" data-origin="customer" aria-pressed="false">Customer change</button>
+      <span style="flex:1"></span>
+      <button class="btn" id="ch-step">Next step</button>
+      <button class="btn pri" id="ch-run">Run</button>
+      <button class="btn" id="ch-reset">Reset</button>
+    </div>
+    <div class="card cgrid">
+      <div class="state" style="margin-bottom:8px">PRODUCT CHANGE MANAGEMENT · ECR → ECO → ECN</div>
+      <div class="phases" id="phases"></div>
+      <p class="caption" id="caption"></p>
+      <div class="railwrap">
+        <div class="strip" id="strip"></div>
+        <div class="rail" id="rail"></div>
+      </div>
+      <div class="gov" id="gov"><b>PROGRAM GOVERNANCE GATE</b><span class="pill">Minor</span><span class="pill">Major</span><span>Classification and approval route follow Program governance. Customer or authority approval where governance requires it.</span></div>
+      <div class="eff dim" id="eff"></div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Illustrative reference scenario for a client workshop. Part names, identifiers and example data are generic.</p>
+    <span>Created by Ángel Rodríguez Gil. Nov.2026</span>
+  </footer>
+  <div class="pbar" id="pbar" aria-live="polite"><span>← → move · Esc exit</span><b id="pcount"></b><button class="btn" id="pexit">Exit</button></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s){return document.querySelector(s)};
+var $$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s))};
+var reduce=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+/* ---------- data (same content decisions as v0.2) ---------- */
+var STAGES=[
+ {name:'Requirements &amp; Configuration',lines:['Requirements &amp;','Configuration'],glyph:'concept',
+  states:'As Proposed · As Specified',chip:'Requirements · cBOM 150%',pkt:'REQ · cBOM 150%',
+  area:'Programme, Systems Engineering, Sales',
+  wing:'The customer’s requirements are captured. The wing is a set of requirements, interfaces and a 150% configurable BOM (cBOM) with options and variants. No geometry is frozen yet.',
+  objects:['Customer requirements','Requirement baseline','cBOM (150% configurable BOM)','Options, variants, compatibility rules','Effectivity by unit or model version'],
+  systems:['PLM (configuration master)','ALM / SW (requirements, summary)'],
+  anchors:['SAE ARP4754B / EUROCAE ED-79B: requirements and traceability','Certification basis set by the customer and the authority']},
+ {name:'Design',lines:['Design'],glyph:'design',
+  states:'As Designed · Systems View',chip:'cBOM → eBOM · SW',pkt:'eBOM · SW PARTS',
+  area:'Mechanical, Electrical, Software, Systems Engineering, with the supply chain',
+  wing:'Structure, fuel, flight-control and harness definition, designed in context in the digital mock-up. The eBOM is filtered from the 150% cBOM by options, variants and effectivity, and software is released from ALM as loadable parts in the eBOM. Make-or-buy is decided early, with Industrialization, and starts Procurement and the supply chain.',
+  objects:['Systems View (architecture)','Model-based 3D definition and DMU','eBOM (filtered from the cBOM)','Software release (ALM), loadable parts','Make-or-buy decision (early)'],
+  systems:['PLM (product master)','PLM (Digital Manufacturing, early)','ALM / SW (summary)','ERP (early demand and procurement signals)'],
+  anchors:['SAE ARP4754B: functions, architecture, allocation','STEP AP242 (ISO 10303-242): model-based 3D data','DO-178C software, DO-254 hardware, where applicable']},
+ {name:'Production',lines:['Production'],glyph:'build',
+  states:'As Prepared · As Built',chip:'mBOM · BOP',pkt:'mBOM · BOP',
+  area:'Industrialization, Part manufacturing, Assembly, Supply chain, Quality',
+  wing:'Industrialization transforms the eBOM into the mBOM and releases it to ERP. Parts are made in the internal plant or bought through the supply chain, then assembled in a dedicated facility. Each wing is recorded serial by serial.',
+  objects:['mBOM (parts and assembly)','BOP (routings, resources)','Procurement and production orders','As-built genealogy'],
+  systems:['PLM (Industrialization, Digital Manufacturing)','ERP (demand planning, procurement, orders)','MOM (per site, IIoT summary)','QMS'],
+  anchors:['ISA-95 (IEC 62264): ERP to MOM integration','AS9100 / EN 9100 production control (IA9100 revision announced)'],link:true},
+ {name:'Testing &amp; Validation',lines:['Testing &amp;','Validation'],glyph:'test',
+  states:'As Attested',chip:'Evidence · FAI',pkt:'AS-BUILT · FAI',
+  area:'Test, Quality Assurance, Certification, Programme',
+  wing:'Two moments: development qualification against the design, and production acceptance of each wing against its as-built record. The accepted wing is delivered to the customer.',
+  objects:['Test plans and evidence','First Article Inspection','Delivery conformity','Compliance and certification data'],
+  systems:['MOM','QMS','ERP (delivery)','PLM (linked)'],
+  anchors:['SAE AS9102C First Article Inspection','Compliance data supporting the customer\u2019s certification']},
+ {name:'Service',lines:['Service'],glyph:'service',
+  states:'As Maintained',chip:'sBOM',pkt:'sBOM',
+  area:'Customer support, Maintenance engineering, MRO',
+  wing:'The delivered wing keeps its serial identity through maintenance, inspection and overhaul, with a service view of its structure. The customer operates it and receives support.',
+  objects:['sBOM, hardware and software view','Maintenance plan','Maintenance and inspection records','Spares and retrofit kits'],
+  systems:['MRO / GMAO','ERP','PLM (linked)'],
+  anchors:['S1000D technical publications','STEP AP239 PLCS (ISO 10303-239): support data']}
+];
+
+/* ---------- navigation ---------- */
+var SCENES=['overview','views','change'];
+function go(id){
+  if(id==='production')id='views';
+  if(SCENES.indexOf(id)<0)id='overview';
+  SCENES.forEach(function(s){
+    $('#s-'+s).classList.toggle('on',s===id);
+    $('#t-'+s).setAttribute('aria-current',s===id?'page':'false');
+  });
+  stopOv();stopPr();stopCh();
+}
+function nav(id){
+  try{ if(location.hash!=='#'+id) location.hash=id; }catch(e){}
+  go(id);
+}
+window.addEventListener('hashchange',function(){go(location.hash.replace('#',''))});
+document.addEventListener('click',function(e){
+  var t=e.target.closest('[data-go]');
+  if(!t)return;
+  var o=t.getAttribute('data-origin'),v=t.getAttribute('data-view');
+  if(o){origin=o;phase=0;}
+  if(v!==null){curView=+v;step=0;}
+  nav(t.getAttribute('data-go'));
+  if(o){renderChange();syncOrigin();}
+  if(v!==null){renderStep(true);window.scrollTo(0,0);}
+});
+
+/* ---------- scene 1 ---------- */
+var COLW=204,X0=150;
+var Y={cust:8,sup:50,card:98,node:246,pm:282,ecr:326,lanes:380};
+function cx(i){return X0+i*COLW+COLW/2}
+function wing(kind){
+  var out='M6 8 L112 30 L112 38 L6 40 Z';
+  var ribs=[[30,12.98,39.55],[54,17.96,39.09],[78,22.9,38.64],[102,27.9,38.2]];
+  var det='<line class="w-sp" x1="6" y1="16" x2="112" y2="32"/><line class="w-sp" x1="6" y1="30.4" x2="112" y2="35.6"/>';
+  ribs.forEach(function(r){det+='<line class="w-rb" x1="'+r[0]+'" y1="'+r[1]+'" x2="'+r[0]+'" y2="'+r[2]+'"/>'});
+  if(kind==='concept')return '<path class="w-ghost" d="'+out+'" transform="translate(0,6)"/><path class="w-ghost" d="'+out+'" transform="translate(0,-4)"/><path class="w-out dash" d="'+out+'"/>';
+  var s='<path class="w-out" d="'+out+'"/>'+det;
+  if(kind==='build'){[20,40,60,80,100].forEach(function(x){s+='<circle class="w-dot" r="1.5" cx="'+x+'" cy="'+(16+(x-6)*0.1509).toFixed(1)+'"/>'})}
+  if(kind==='test'){[[30,25.5],[66,29.2],[96,32.2]].forEach(function(p){s+='<g transform="translate('+p[0]+','+p[1]+')"><circle class="w-ok" r="3.4"/><path class="w-ok" d="M-1.5 0 L-.4 1.3 L1.7 -1.3"/></g>'})}
+  if(kind==='service'){[[54,28],[90,32]].forEach(function(p){s+='<circle class="w-sv" r="4.2" cx="'+p[0]+'" cy="'+p[1]+'"/>'})}
+  return s;
+}
+var LANES=[
+ {n:'PLM · Product',c:'#5ad1ff',ic:'cube',seg:[[1,3,'p','Configuration master · cBOM 150% · eBOM · change mgmt'],[4,5,'l','Linked: evidence · sBOM']]},
+ {n:'PLM · Digital Mfg',c:'#6aa8ff',ic:'factory',seg:[[2,3,'p','Industrialization · Digital Manufacturing · mBOM · BOP']]},
+ {n:'ALM / SW',c:'#a99aff',ic:'code',seg:[[1,2,'p','Requirements · software release (summary)']]},
+ {n:'ERP',c:'#f58bc6',ic:'bars',seg:[[1,2,'l','Demand signals · early procurement'],[3,5,'p','mBOM received · MRP · procurement · orders · logistics']]},
+ {n:'MOM',c:'#b7e66b',ic:'gear',seg:[[3,4,'p','Execution per site · as-built · IIoT (summary)']]},
+ {n:'QMS',c:'#ff8f8f',ic:'shield',seg:[[3,4,'p','Inspection · nonconformance · FAI']]},
+ {n:'MRO / GMAO',c:'#57c7d9',ic:'wrench',seg:[[5,5,'p','Maintenance · spare parts']]}
+];
+var ICON={
+ cube:'<path d="M8 1L14 4.5V11.5L8 15L2 11.5V4.5Z M2 4.5L8 8L14 4.5 M8 8V15"/>',
+ factory:'<path d="M1 15V7L5 9.5V7L9 9.5V3H13V15Z M4 12.5H6 M9 12.5H11"/>',
+ code:'<path d="M5 4L1 8L5 12 M11 4L15 8L11 12 M9.5 3L6.5 13"/>',
+ bars:'<path d="M2 14V9 M6 14V5 M10 14V7 M14 14V2 M1 15H15"/>',
+ gear:'<circle cx="8" cy="8" r="3.2"/><path d="M8 1V3.5 M8 12.5V15 M1 8H3.5 M12.5 8H15 M3 3L4.8 4.8 M11.2 11.2L13 13 M13 3L11.2 4.8 M4.8 11.2L3 13"/>',
+ shield:'<path d="M8 1L14 3.5V8C14 11.5 11 14 8 15C5 14 2 11.5 2 8V3.5Z M5 8L7 10L11 6"/>',
+ people:'<circle cx="5.5" cy="5" r="2.3"/><circle cx="11.2" cy="5.6" r="2"/><path d="M1.5 14C1.5 10.5 3.5 9 5.5 9S9.5 10.5 9.5 14 M9.6 9.6C11.8 9.2 14.5 10.4 14.5 14"/>',
+ net:'<circle cx="3" cy="8" r="2"/><circle cx="13" cy="3.5" r="2"/><circle cx="13" cy="12.5" r="2"/><path d="M5 7.2L11 4.3 M5 8.8L11 11.7"/>',
+ cycle:'<path d="M13.5 6A5.8 5.8 0 0 0 3 4.5 M2.5 10A5.8 5.8 0 0 0 13 11.5 M3 1.5V4.8H6.3 M13 14.5V11.2H9.7"/>',
+ wrench:'<path d="M14.5 4.5A3.6 3.6 0 0 1 9.6 8.9L4 14.5A1.4 1.4 0 0 1 2 12.5L7.6 6.9A3.6 3.6 0 0 1 12 1.5L9.8 3.7L10.4 5.6L12.3 6.2Z"/>'
+};
+var PLANE='<path d="M12 1C13 1 13.5 2.5 13.5 4V9L22 14V16L13.5 13.5V19L16 21V22.5L12 21.5L8 22.5V21L10.5 19V13.5L2 16V14L10.5 9V4C10.5 2.5 11 1 12 1Z"/>';
+function badge(x,y,t){var w=t.length*9+18;return '<rect class="iob" x="'+x+'" y="'+y+'" width="'+w+'" height="20" rx="10"/><text class="iot" x="'+(x+w/2)+'" y="'+(y+14)+'" text-anchor="middle">'+t+'</text>'}
+var busY=0;
+function buildOv(){
+  var W=5*COLW, nY=Y.node, cY=Y.card;
+  var s='<defs>'+
+   '<marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>'+
+   '<marker id="arc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--thread)"/></marker>'+
+   '<marker id="aio" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--thread)"/></marker>'+
+   '<linearGradient id="cg" x1="0" x2="1"><stop offset="0" stop-color="#5ad1ff" stop-opacity=".24"/><stop offset=".5" stop-color="#a99aff" stop-opacity=".12"/><stop offset="1" stop-color="#5ad1ff" stop-opacity=".24"/></linearGradient>'+
+   '<filter id="glow" x="-200%" y="-20%" width="500%" height="140%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'+
+   '<marker id="asc" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3" markerHeight="3" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:#a9bde3"/></marker>'+
+   '</defs>';
+  // customer: start and end of the process
+  var cm=X0+W/2;
+  s+='<rect class="band cust" x="'+X0+'" y="4" width="'+W+'" height="40" rx="12"/>';
+  s+='<g class="acft" transform="translate('+(cm-112)+',12)">'+PLANE+'</g>';
+  s+='<g class="acft" transform="translate('+(cm+88)+',12)">'+PLANE+'</g>';
+  s+='<text class="custt" x="'+cm+'" y="30" text-anchor="middle">CUSTOMER / OEM</text>';
+  s+='<text class="lbl" x="16" y="28">CUSTOMER</text>';
+  s+='<path class="io" d="M'+cx(0)+' 46 V'+(cY-6)+'" marker-end="url(#aio)"/>';
+  s+=badge(cx(0)+12,58,'IN');
+  s+='<path class="io" d="M'+cx(3)+' '+(cY-2)+' V52" marker-end="url(#aio)"/>';
+  s+=badge(cx(3)-56,58,'OUT');
+  s+='<path class="clink" style="stroke-dasharray:4 3" d="M'+cx(4)+' '+cY+' V'+(Y.cust+40)+'" marker-end="url(#arc)"/>';
+  s+='<text class="lbl th sm" x="'+(cx(4)-8)+'" y="76" text-anchor="end">IN-SERVICE SUPPORT</text>';
+  // supply chain across Design and Production
+  var sx=X0+COLW+8, sw=2*COLW-16;
+  s+='<g style="color:#a9bde3">';
+  s+='<rect class="sband" x="'+sx+'" y="'+Y.sup+'" width="'+sw+'" height="30" rx="10"/>';
+  s+='<g class="lic" transform="translate('+(sx+11)+','+(Y.sup+7)+')">'+ICON.net+'</g>';
+  s+='<text class="stt" x="'+(sx+34)+'" y="'+(Y.sup+19)+'">SUPPLY CHAIN VALUE COLLABORATION</text>';
+  s+='<rect class="schip" x="'+(sx+sw-124)+'" y="'+(Y.sup+5)+'" width="116" height="20" rx="10"/>';
+  s+='<text class="sct" x="'+(sx+sw-66)+'" y="'+(Y.sup+19)+'" text-anchor="middle">SUB-TIER SUPPLIERS</text>';
+  [1,2].forEach(function(i){s+='<path class="slink" d="M'+cx(i)+' '+(Y.sup+33)+' V'+(cY-3)+'" marker-start="url(#asc)" marker-end="url(#asc)"/>'});
+  s+='</g>';
+  s+='<text class="lbl" x="16" y="'+(Y.sup+19)+'">SUPPLY CHAIN</text>';
+  // row labels
+  s+='<text class="lbl" x="16" y="'+(cY+64)+'">COMPANY VIEW</text>';
+  s+='<text class="lbl" x="16" y="'+(nY+4)+'">PRODUCT THREAD</text>';
+  // lanes geometry
+  var laneY=[],yy=Y.lanes;
+  LANES.forEach(function(){laneY.push(yy);yy+=38});
+  busY=yy+16;
+  // feedback layer
+  s+='<g id="g-fbk" class="layer">';
+  s+='<path class="fbk" d="M'+cx(4)+' '+(nY+14)+' V'+busY+' H'+cx(0)+' V'+(nY+16)+'" marker-end="url(#arr)"/>';
+  s+='<path class="fbk" d="M'+cx(1)+' '+busY+' V'+(nY+16)+'" marker-end="url(#arr)"/>';
+  s+='<text class="lbl" x="'+((cx(0)+cx(4))/2)+'" y="'+(busY+24)+'" text-anchor="middle" style="fill:var(--ok)">AS-BUILT AND AS-MAINTAINED DATA RETURN TO REQUIREMENTS AND DESIGN</text>';
+  s+='</g>';
+  // thread
+  s+='<line class="thr-base" x1="'+X0+'" y1="'+nY+'" x2="'+(X0+W)+'" y2="'+nY+'"/>';
+  s+='<line class="thr" x1="'+X0+'" y1="'+nY+'" x2="'+(X0+W)+'" y2="'+nY+'"/>';
+  // program management, end to end
+  s+='<g style="color:#dfe7f7">';
+  s+='<circle class="lbadge" cx="27" cy="'+(Y.pm+17)+'" r="12"/><g class="lic" transform="translate(19,'+(Y.pm+9)+')">'+ICON.people+'</g>';
+  s+='<text class="lname" x="45" y="'+(Y.pm+14)+'">PROGRAM</text><text class="lname" x="45" y="'+(Y.pm+27)+'">MANAGEMENT</text>';
+  s+='<rect class="pmband" x="'+X0+'" y="'+Y.pm+'" width="'+W+'" height="34" rx="9"/>';
+  var PM=['People','Governance','Integrative Project Architecture','Risks &amp; Issues'],cw=(W-16-30)/4;
+  PM.forEach(function(t,k){var x=X0+8+k*(cw+10);s+='<text class="pmt" x="'+(x+cw/2)+'" y="'+(Y.pm+21)+'" text-anchor="middle">'+t+'</text>'});
+  s+='</g>';
+  // change layer
+  s+='<g id="g-chg" class="layer">';
+  s+='<g style="color:#ffb347"><circle class="lbadge" cx="27" cy="'+(Y.ecr+13)+'" r="12"/><g class="lic" transform="translate(19,'+(Y.ecr+5)+')">'+ICON.cycle+'</g><text class="lname" x="45" y="'+(Y.ecr+17)+'">CHANGE</text></g>';
+  s+='<rect class="ecr" x="'+X0+'" y="'+Y.ecr+'" width="'+W+'" height="26" rx="8"/>';
+  STAGES.forEach(function(st,i){s+='<path class="dia" d="M'+cx(i)+' '+(Y.ecr-4)+' l4 4 l-4 4 l-4 -4z"/>'});
+  s+='<text class="lbl am2" x="'+(X0+W/2)+'" y="'+(Y.ecr+17)+'" text-anchor="middle">ECR → IMPACT → ECO → ECN BY EFFECTIVITY</text>';
+  s+='</g>';
+  // systems layer
+  s+='<g id="g-sys" class="layer">';
+  s+='<text class="lbl" x="16" y="'+(Y.lanes-10)+'">SYSTEMS OF RECORD</text>';
+  LANES.forEach(function(L,r){
+    var y=laneY[r],mid=y+15;
+    s+='<g style="color:'+L.c+'">';
+    s+='<circle class="lbadge" cx="27" cy="'+mid+'" r="12"/>';
+    s+='<g class="lic" transform="translate(19,'+(mid-8)+')">'+ICON[L.ic]+'</g>';
+    s+='<text class="lname" x="45" y="'+(mid+4)+'">'+L.n+'</text>';
+    L.seg.forEach(function(g){
+      var x=X0+(g[0]-1)*COLW+8,w=(g[1]-g[0]+1)*COLW-16,lk=g[2]==='l';
+      s+='<rect class="lbase" x="'+x+'" y="'+y+'" width="'+w+'" height="30" rx="8"/>';
+      s+='<rect class="lane'+(lk?' link':'')+'" x="'+x+'" y="'+y+'" width="'+w+'" height="30" rx="8"/>';
+      if(!lk)s+='<rect class="lacc" x="'+x+'" y="'+(y+5)+'" width="3" height="20" rx="1.5"/>';
+      s+='<text class="lanet" x="'+(x+14)+'" y="'+(mid+4)+'"'+(lk?' style="fill:var(--muted)"':'')+'>'+g[3]+'</text>';
+    });
+    s+='</g>';
+  });
+  s+='</g>';
+  // stages
+  STAGES.forEach(function(st,i){
+    var x=X0+i*COLW+8,w=COLW-16;
+    s+='<g class="stage'+(i===0?' sel':'')+'" data-i="'+i+'" tabindex="0" role="button" aria-label="'+st.name+'">';
+    s+='<rect class="cardbg" x="'+x+'" y="'+cY+'" width="'+w+'" height="122" rx="12"/>';
+    s+='<g transform="translate('+(x+(w-96)/2)+','+(cY+6)+') scale(.8)">'+wing(st.glyph)+'</g>';
+    if(st.lines.length===2){
+      s+='<text class="sname" x="'+cx(i)+'" y="'+(cY+57)+'" text-anchor="middle">'+st.lines[0]+'</text>';
+      s+='<text class="sname" x="'+cx(i)+'" y="'+(cY+73)+'" text-anchor="middle">'+st.lines[1]+'</text>';
+    }else{
+      s+='<text class="sname" x="'+cx(i)+'" y="'+(cY+66)+'" text-anchor="middle">'+st.lines[0]+'</text>';
+    }
+    s+='<text class="lbl th" x="'+cx(i)+'" y="'+(cY+91)+'" text-anchor="middle">'+st.states+'</text>';
+    s+='<rect class="chip" x="'+(x+12)+'" y="'+(cY+98)+'" width="'+(w-24)+'" height="18" rx="9"/>';
+    s+='<text class="chipt" x="'+cx(i)+'" y="'+(cY+111)+'" text-anchor="middle">'+st.chip+'</text>';
+    s+='<line class="stem" x1="'+cx(i)+'" y1="'+(cY+122)+'" x2="'+cx(i)+'" y2="'+(nY-12)+'"/>';
+    s+='<circle class="node" cx="'+cx(i)+'" cy="'+nY+'" r="12"/>';
+    s+='<text class="nodet" x="'+cx(i)+'" y="'+(nY+4)+'" text-anchor="middle">'+(i+1)+'</text>';
+    s+='</g>';
+  });
+  // moving data object
+  s+='<path id="pktPath" d="M'+cx(0)+' '+nY+' H'+cx(4)+' V'+busY+' H'+cx(0)+' V'+nY+'" style="fill:none;stroke:none"/>';
+  s+='<g id="pkt" transform="translate('+cx(0)+','+nY+')"'+(reduce?' style="display:none"':'')+'><circle class="pk-dot" r="4.5"/><g class="pk-lab"><rect class="pk-box" x="-38" y="12" width="76" height="17" rx="8.5"/><text class="pk-t" y="24" text-anchor="middle">REQ · 150%</text></g></g>';
+  return s;
+}
+function list(a){return '<ul>'+a.map(function(x){return '<li>'+x+'</li>'}).join('')+'</ul>'}
+function sel(i){
+  $$('#ov .stage').forEach(function(g){g.classList.toggle('sel',+g.getAttribute('data-i')===i)});
+  var st=STAGES[i];
+  $('#ov').classList.toggle('loop',i===4);
+  $('#detail').innerHTML=
+   '<div class="dhead"><span class="num">0'+(i+1)+'</span><div><h2>'+st.name+'</h2><div class="state">'+st.states+'</div></div></div>'+
+   '<p class="wingtxt">'+st.wing+'</p>'+
+   '<div class="dgrid">'+
+   '<div><h3>Company areas</h3><p>'+st.area+'</p></div>'+
+   '<div><h3>Key objects</h3>'+list(st.objects)+'</div>'+
+   '<div><h3>Systems</h3>'+list(st.systems)+'</div>'+
+   '<div class="an"><h3>Standards references</h3>'+list(st.anchors)+'</div>'+
+   '</div>'+
+   '<button class="btn pri go" data-go="views" data-view="'+i+'">Open the '+st.name+' view →</button>';
+}
+var ovT=null;
+function stopOv(){if(ovT){clearInterval(ovT);ovT=null}var b=$('#ov-play');if(b)b.textContent='Play the thread'}
+function playOv(){
+  if(ovT){stopOv();return}
+  var k=0;sel(0);$('#ov-play').textContent='Pause';
+  ovT=setInterval(function(){k=(k+1)%STAGES.length;sel(k)},2200);
+}
+$('#ov').innerHTML=buildOv();
+$('#ov').addEventListener('click',function(e){var g=e.target.closest('.stage');if(g){stopOv();sel(+g.getAttribute('data-i'))}});
+$('#ov').addEventListener('keydown',function(e){
+  if(e.key==='Enter'||e.key===' '){var g=e.target.closest('.stage');if(g){e.preventDefault();stopOv();sel(+g.getAttribute('data-i'))}}
+});
+$('#ov-play').addEventListener('click',playOv);
+$$('.tg').forEach(function(b){b.addEventListener('click',function(){
+  var on=b.getAttribute('aria-pressed')!=='true';
+  b.setAttribute('aria-pressed',on?'true':'false');
+  $('#ov').classList.toggle('hide-'+b.getAttribute('data-layer'),!on);
+})});
+sel(0);
+
+/* data object: travels the thread, changes form at each view, returns as feedback */
+(function(){
+  if(reduce)return;
+  var path=$('#pktPath'),g=$('#pkt'),txt=g.querySelector('.pk-t'),box=g.querySelector('.pk-box');
+  var L=path.getTotalLength(),fwd=4*COLW,dur=17000,t0=null,lastLab='',hotK=-2;
+  var stages=$$('#ov .stage');
+  function setLab(lab){
+    if(lab===lastLab)return;lastLab=lab;txt.textContent=lab;
+    var w=Math.round(lab.length*6+18);box.setAttribute('width',w);box.setAttribute('x',-w/2);
+  }
+  function setHot(k){
+    if(k===hotK)return;hotK=k;
+    stages.forEach(function(s,i){s.classList.toggle('hot',i===k)});
+  }
+  function frame(ts){
+    if(t0===null)t0=ts;
+    var d=((ts-t0)%dur)/dur*L,p=path.getPointAtLength(d),back=d>fwd+0.5;
+    g.setAttribute('transform','translate('+p.x.toFixed(1)+','+p.y.toFixed(1)+')');
+    g.classList.toggle('back',back);
+    if(back){setLab('AS-BUILT · AS-MAINTAINED');setHot(-1);}
+    else{
+      var k=Math.min(4,Math.max(0,Math.floor((p.x-cx(0)+12)/COLW)));
+      setLab(STAGES[k].pkt);
+      setHot(Math.abs(p.x-cx(k))<16?k:-1);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* ---------- scene 2: Views ---------- */
+function rows(a,hd){return (hd?'<div class="rechd">'+hd+'</div>':'')+'<ul class="rows">'+a.map(function(r){return '<li><span>'+r[0]+'</span>'+(r[1]?'<em'+(r[2]?' class="'+r[2]+'"':'')+'>'+r[1]+'</em>':'')+'</li>'}).join('')+'</ul>'}
+function table(hd,r){return '<div class="tablewrap"><table class="bop"><thead><tr>'+hd.map(function(x){return '<th>'+x+'</th>'}).join('')+'</tr></thead><tbody>'+r.map(function(x){return '<tr>'+x.map(function(c){return '<td>'+c+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>'}
+function note(t){return '<p class="hint" style="margin-top:10px">'+t+'</p>'}
+var SNAKE=[[2,22],[122,22],[242,22],[242,166],[122,166],[2,166]];
+var SE=[['e1','M102 42 H122'],['e2','M222 42 H242'],['e3','M292 62 V166'],['e4','M242 186 H222'],['e5','M122 186 H102']];
+function snake(nodes,cap){
+  return {N:nodes.map(function(n,k){return [n[0],SNAKE[k][0],SNAKE[k][1],100,n[1],n[2],n[3]||'']}),
+          E:SE.slice(0,nodes.length-1),cap:[172,118,cap]};
+}
+var OPS_ASSY=table(['Op','Assembly operation','Resources','Quality point'],[
+ ['10','Spar sub-assembly','Assembly jig, drilling cell','In-process check'],
+ ['20','Rib installation','Assembly jig','In-process check'],
+ ['30','Skin panel fit','Fit-up fixture','Gap and step check'],
+ ['40','Wing box closure','Closure tooling, certified operators','First article inspection'],
+ ['50','Systems installation','Installation rig','Functional check'],
+ ['60','Software load, final assembly','Load station','Release to test']]);
+var OPS_PART=table(['Part','Process','Resources','Quality point'],[
+ ['Front spar','Machining','NC machining cell, NC program','First article inspection'],
+ ['Rear spar','Machining','NC machining cell, NC program','In-process check'],
+ ['Ribs','Machining','NC cell, fixtures','In-process check']])+note('Skin panels and systems are flagged buy. They come through Supply Chain Value, with their records.');
+
+var VIEWS=[
+ /* 1 Requirements & Configuration */
+ {hint:'From the customer’s need to a released, traceable baseline.',
+  map:snake([['cust','Customer','spec, contract','cust'],['req','Requirements','baseline'],['m150','cBOM 150%','options, variants'],['eff','Effectivity','units, versions'],['des','Design','traceable release']],'TO A RELEASED BASELINE'),
+  steps:[
+  {k:'Contract & specification',state:'As Proposed',title:'The customer’s need arrives',
+   change:'The customer or OEM issues the specification and contract for the wing: functions, interfaces, performance, certification basis and delivery schedule.',
+   body:rows([['Technical specification','interfaces, loads, performance','mu'],['Contract','delivery batches, schedule','mu'],['Certification basis','set with the customer and authority','mu'],['Statement of work','scope of the Tier-1','mu']]),
+   on:['PLM','ALM / SW'],n:['cust','req'],e:['e1'],
+   hand:'Specification and contract enter the programme baseline. Program Management sets people, governance and the project architecture.'},
+  {k:'Capture & baseline',state:'As Specified',title:'Capture and baseline the requirements',
+   change:'Customer requirements are decomposed into wing-level requirements. Each one is traceable to its source and to how it will be verified.',
+   body:table(['ID','Requirement','Source','Verification'],[['WR-001','Interface to fuselage','Customer spec','Test'],['WR-014','Fuel quantity','Customer spec','Analysis, test'],['WR-022','Flight control loads','Customer spec','Test'],['WR-031','Embedded software function','System requirement','Review, test']])+note('Requirement IDs are examples.'),
+   on:['PLM','ALM / SW'],n:['req'],e:[],
+   hand:'Requirements live in the requirements tool and are linked to the product structure in PLM.'},
+  {k:'cBOM (150%)',state:'As Specified',title:'One configurable BOM for every variant',
+   change:'The cBOM is the 150% configurable structure. It holds every option and variant the customer may order, with the rules that say which combinations are allowed. Common content is defined once.',
+   body:'<ul class="tree"><li><b>Wing family</b><span class="tag">cBOM · 150%</span><ul><li>Primary structure<span class="tag ok">common</span></li><li>Fuel, flight control and electrical systems<span class="tag ok">common</span></li><li>Option group: wingtip device<ul><li>Option A<span class="tag">option</span></li><li>Option B<span class="tag">option</span></li></ul></li><li>Variant: fuel capacity<ul><li>Standard<span class="tag">variant</span></li><li>Extended<span class="tag">variant</span></li></ul></li><li>Embedded software<span class="tag">release per configuration</span></li><li>Compatibility rules<span class="tag am">e.g. extended fuel needs Option A</span></li></ul></li></ul>'+note('Options, variants and rules are examples.'),
+   on:['PLM'],n:['req','m150'],e:['e2'],
+   hand:'The cBOM in PLM is the configuration master for every later view.'},
+  {k:'Effectivity',state:'As Specified',title:'Decide what applies to which aircraft',
+   change:'Effectivity says which definition applies to which aircraft: by unit (serial number) or by model version that is later assigned to units. Dates are rarely used in A&D.',
+   body:table(['Item','Effectivity','Criterion'],[['Wingtip device, Option A','Units 1 to 10','Unit'],['Wingtip device, Option B','Units 11 onwards','Unit'],['Extended fuel capacity','Model version V2','Model version'],['Software release','From a unit set by ECN','Unit']])+note('Effectivity sits on the links of the configured structure, so one change can apply to every affected configuration in one operation. Values are examples.'),
+   on:['PLM','ERP'],n:['m150','eff'],e:['e3'],
+   hand:'Effectivity in PLM decides what each unit gets. ERP receives early demand signals per batch.'},
+  {k:'Release to Design',state:'As Specified',title:'A traceable, approved starting point',
+   change:'The requirement baseline and the cBOM are released together. From here on, any change goes through Product Change Management.',
+   body:rows([['Requirement baseline','released'],['cBOM (150%)','released'],['Traceability','requirement → design → verification','th'],['Changes after release','ECR → ECO → ECN','am']])+'<button class="btn pri go" data-go="change" data-origin="customer">See a customer change →</button>',
+   on:['PLM','ALM / SW'],n:['eff','des'],e:['e4'],
+   hand:'Design starts from the released baseline. The Systems View is its first step.'}
+ ]},
+ /* 2 Design */
+ {hint:'From requirements to a released eBOM, hardware and software together.',
+  map:snake([['sys','Systems View','architecture'],['dmu','Design','in context, DMU'],['val','Validation','virtual'],['bom','cBOM → eBOM','filtered 150%'],['sw','SW release','ALM baseline'],['ind','Make or buy','early decision']],'HARDWARE + SOFTWARE'),
+  steps:[
+  {k:'Systems View',state:'As Designed · Systems View',title:'Allocate functions to systems',
+   change:'Wing requirements are allocated to functions and systems. Interfaces between structure, systems and software are defined before detail design.',
+   body:'<ul class="tree"><li><b>Wing system architecture</b><span class="tag">Systems View</span><ul><li>Structural function<span class="tag ok">allocated</span></li><li>Fuel function<span class="tag ok">allocated</span></li><li>Flight control function<span class="tag ok">allocated</span></li><li>Electrical distribution<span class="tag ok">allocated</span></li><li>Embedded software functions<span class="tag ok">allocated</span></li><li>Interfaces to fuselage and aircraft systems<span class="tag am">agreed with the customer</span></li></ul></li></ul>',
+   on:['PLM','ALM / SW'],n:['sys'],e:[],
+   hand:'Functions, systems and interfaces are linked to the requirements in PLM and ALM.'},
+  {k:'Design in context',state:'As Designed',title:'Each discipline designs in context',
+   change:'Structure, systems, harness and software are designed in the digital mock-up, in the context of the whole wing.',
+   body:table(['Discipline','Scope','Definition'],[['Structure','Spars, ribs, skin panels','Model-based 3D definition'],['Systems','Fuel and flight control equipment','3D installation'],['Electrical','Harness','Wiring data and 3D routing'],['Software','Embedded functions','Code and models in ALM']]),
+   on:['PLM','ALM / SW'],n:['sys','dmu'],e:['e1'],
+   hand:'Designs are managed in PLM and software in ALM, both against the same configuration.'},
+  {k:'Virtual validation',state:'As Designed',title:'Check before anything is built',
+   change:'The design is checked virtually: clashes, clearances, strength and assembly feasibility, with Industrialization involved early.',
+   body:rows([['DMU clash and clearance','checked in the mock-up','mu'],['Stress and fatigue','analysis results linked','mu'],['Assembly feasibility','reviewed with Industrialization','mu'],['Software','verified against its models','mu']]),
+   on:['PLM','ALM / SW'],n:['dmu','val'],e:['e2'],
+   hand:'Results are linked to the design and to the requirements they verify.'},
+  {k:'cBOM → eBOM',state:'As Designed',title:'From the 150% cBOM to the eBOM',
+   change:'The cBOM holds every option and variant. Filtering it by the ordered options, variants and effectivity gives the eBOM for this configuration.',
+   body:'<div class="split"><div class="col"><h3>cBOM · 150%, configurable</h3><ul class="rows"><li><span>Primary structure</span></li><li><span>Fuel, flight control, electrical</span></li><li><span>Wingtip device</span><em class="mu">A or B</em></li><li><span>Fuel capacity</span><em class="mu">standard or extended</em></li><li><span>Software</span><em class="mu">per configuration</em></li></ul></div>'+
+    '<div class="col make"><h3>eBOM · ordered configuration</h3><ul class="rows"><li><span>Primary structure</span></li><li><span>Fuel, flight control, electrical</span></li><li><span>Wingtip device</span><em>Option A</em></li><li><span>Fuel capacity</span><em>standard</em></li><li><span>Software</span><em class="th">loadable parts</em></li></ul></div></div>'+
+    note('Filter: Option A, standard fuel, units 1 to 10. Example values.'),
+   on:['PLM'],n:['val','bom'],e:['e3'],
+   hand:'The eBOM is released in PLM under configuration control, still linked to the cBOM it was filtered from.'},
+  {k:'Software release (ALM)',state:'As Designed',title:'Release software as a configured part',
+   change:'Embedded software follows its own lifecycle in ALM: requirements, design, code and verification. Once baselined, it is released as a loadable software part with a part number and version, and linked into the eBOM.',
+   body:rows([['Software requirements','traced to system requirements','mu'],['Code and verification','managed in ALM','mu'],['Software baseline','released, version X','th'],['Loadable software part','part number in the eBOM','th'],['Compatibility','software version ↔ hardware configuration','am']]),
+   on:['PLM','ALM / SW'],n:['bom','sw'],e:['e4'],
+   hand:'Hardware and software now share one configuration in PLM. Production loads the released version, and Service maintains it.'},
+  {k:'Make or buy & release',state:'As Designed',title:'Decide early, release to Production',
+   change:'With Industrialization and the supply chain, each item is flagged make or buy early. The eBOM is then released to Production.',
+   body:rows([['Spars and ribs','make · internal parts plant'],['Skin panels','buy · supply chain','am'],['Systems equipment','buy · supply chain','am'],['Embedded software','loadable part · loaded at assembly','th']])+'<button class="btn pri go" data-go="views" data-view="2">Continue to the Production view →</button>',
+   on:['PLM','ERP'],n:['sw','ind'],e:['e5'],
+   hand:'Make-or-buy flags give ERP early demand and procurement signals, and start the supplier data packages.'}
+ ]},
+ /* 3 Production */
+ {hint:'eBOM to mBOM, mBOM to ERP, then parts made or bought, assembled and recorded.',
+  map:{N:[['design',10,96,82,'Digital Mfg','eBOM → mBOM',''],['erp',10,178,82,'ERP','mBOM, orders',''],['plant',122,22,104,'Parts plant','internal · make',''],['sup',122,168,104,'Supplier','external · buy','sup'],['assy',250,96,90,'Assembly','dedicated site',''],['rec',250,178,90,'As-built','genealogy','']],
+       E:[['de','M51 136 V178'],['dp','M92 109 C108 109 106 42 122 42'],['ds','M92 123 C108 123 106 188 122 188'],['pa','M226 42 C240 42 236 109 250 109'],['sa','M226 188 C240 188 236 123 250 123'],['ar','M295 136 V178']],
+       cap:[174,223,'VIA SUPPLY CHAIN VALUE']},
+  steps:[
+  {k:'eBOM from Design',state:'As Designed',title:'Input from Design',
+   change:'The eBOM for the ordered configuration is released from Design, with its loadable software parts and the make-or-buy flags already set.',
+   body:'<ul class="tree"><li><b>Wing assembly</b><span class="tag">eBOM · from Design</span><span class="tag am">effectivity: units 1 to 10, example</span><ul>'+
+    '<li>Front spar<span class="tag ok">make</span></li><li>Rear spar<span class="tag ok">make</span></li><li>Ribs<span class="tag ok">make</span></li>'+
+    '<li>Skin panels<span class="tag am">buy</span></li><li>Fuel system<span class="tag am">buy</span></li><li>Flight control actuation<span class="tag am">buy</span></li><li>Electrical harness<span class="tag am">buy</span></li>'+
+    '<li>Wingtip device, Option A<span class="tag ok">make</span></li>'+
+    '<li>Embedded software<span class="tag">loadable part, version X</span></li></ul></li></ul>',
+   on:['PLM'],n:['design'],e:[],
+   hand:'Industrialization receives the released eBOM. Procurement and the supply chain start from the same data.'},
+  {k:'eBOM → mBOM',state:'As Prepared',title:'Restructure for manufacturing',
+   change:'Industrialization transforms the eBOM into the mBOM: organised by assembly sequence and site, with make or buy applied and manufacturing-only items added. Effectivity is carried over from the eBOM.',
+   body:'<div class="split"><div class="col"><h3>eBOM · by function</h3><ul class="rows"><li><span>Primary structure</span></li><li><span>Fuel system</span></li><li><span>Flight control actuation</span></li><li><span>Electrical harness</span></li><li><span>Wingtip device, Option A</span></li><li><span>Embedded software</span></li></ul></div>'+
+    '<div class="col make"><h3>mBOM · by assembly sequence</h3><ul class="rows"><li><span>10 Spar sub-assemblies</span><em>make</em></li><li><span>20 Rib kit</span><em>make</em></li><li><span>30 Skin panel kit</span><em class="am">buy</em></li><li><span>40 Wing box closure</span></li><li><span>50 Systems installation</span><em class="am">buy items</em></li><li><span>60 Software load, final assembly</span><em class="th">SW part</em></li><li><span>Sealant and fastener kits</span><em class="mu">mfg only</em></li></ul></div></div>'+
+    note('Each mBOM node consumes eBOM parts, so every eBOM part is accounted for once.'),
+   on:['PLM'],n:['design'],e:[],
+   hand:'The mBOM lives in PLM (Digital Manufacturing), linked to the eBOM parts it consumes.'},
+  {k:'Release to ERP',state:'As Prepared',title:'mBOM and routings to ERP',
+   change:'The released mBOM and routings are transferred to ERP. Make or buy drives material planning: production orders for make items, purchase orders for buy items. The BOP and work instructions go to MOM.',
+   body:table(['Object','From','To','Used for'],[['mBOM','PLM','ERP','Material planning (MRP)'],['Routings','PLM','ERP','Capacity, production orders'],['Buy items','PLM','ERP','Procurement, supplier orders'],['BOP, work instructions','PLM','MOM','Execution on the shop floor']])+
+    '<div class="exch"><div><h3>Sent to supplier</h3><p>Model-based definition, specification, quality requirements</p></div><div><h3>Returned by supplier</h3><p>Parts, certificate of conformity, first-article data</p></div></div>',
+   on:['PLM','ERP','MOM'],n:['design','erp'],e:['de'],
+   hand:'PLM stays the master of the definition. ERP and MOM receive released data only, so every site builds the same configuration.'},
+  {k:'Part manufacturing',state:'As Prepared · As Built',title:'Part manufacturing',
+   change:'Parts flagged make are built at the internal parts plant against ERP production orders. Bought parts arrive from the supply chain against purchase orders.',
+   body:OPS_PART,
+   on:['PLM','ERP','MOM','QMS'],n:['erp','plant','sup'],e:['dp','ds'],
+   hand:'Part routings and NC data reach the plant MOM. Supplier parts are received with their certificates.'},
+  {k:'Assembly',state:'As Prepared · As Built',title:'Assembly',
+   change:'The dedicated assembly facility receives parts from the plant and the suppliers, and builds the wing to the assembly mBOM and BOP. The released software version is loaded.',
+   body:OPS_ASSY,
+   on:['PLM','ERP','MOM','QMS'],n:['plant','sup','assy'],e:['pa','sa'],
+   hand:'ERP kits and orders, MOM executes and records, QMS inspects.'},
+  {k:'As-built genealogy',state:'As Built',title:'One record from many sources',
+   change:'Part records from the plant and the suppliers merge with assembly data into one serial-level record of what was really built.',
+   body:rows([['Front spar','internal plant · serial and lot'],['Skin panels','supplier · certificate and lot'],['Fastener torque','assembly site · values by tool'],['Embedded software','part number and version loaded','th'],['Nonconformance','1 open, disposition pending','am']],'Wing record · serial number, example')+
+    '<button class="btn pri go" data-go="change" data-origin="production">Raise an ECR from this nonconformance →</button>',
+   on:['ERP','MOM','QMS','PLM'],n:['plant','sup','assy','rec'],e:['pa','sa','ar'],
+   hand:'The as-built record returns to PLM, ready for acceptance, delivery and the closed loop to Design.'}
+ ]},
+ /* 4 Testing & Validation */
+ {hint:'Prove the design, then prove each wing.',
+  map:snake([['des','Design','requirements'],['qual','Qualification','development tests'],['prod','Production','as-built'],['acc','Acceptance','per serial, FAI'],['conf','Conformity','spec. vs built'],['cust','Customer','delivery','cust']],'PROVE, THEN ACCEPT'),
+  steps:[
+  {k:'Development qualification',state:'As Attested',title:'Prove the design meets each requirement',
+   change:'Tests, analyses and reviews show the design meets every requirement, before series production. This is the evidence side of traceability.',
+   body:table(['Requirement','Method','Evidence'],[['WR-001 Interface','Test','Test report'],['WR-014 Fuel quantity','Analysis, test','Analysis and test report'],['WR-022 Flight control loads','Test','Test report'],['WR-031 Software function','Review, test','Verification records']]),
+   on:['PLM','ALM / SW','QMS'],n:['des','qual'],e:['e1'],
+   hand:'Evidence is linked to the requirements in PLM and ALM, closing the verification loop.'},
+  {k:'Production acceptance',state:'As Attested',title:'Accept each wing, serial by serial',
+   change:'Each wing is tested against its own as-built record before it can be delivered.',
+   body:rows([['Functional tests: fuel, flight controls','per serial'],['Electrical continuity','per serial'],['Software version check','per serial'],['Results','stored with the as-built record','th']]),
+   on:['MOM','QMS'],n:['prod','acc'],e:['e3'],
+   hand:'Acceptance results are recorded in MOM and QMS against the serial number.'},
+  {k:'First Article Inspection',state:'As Attested',title:'Prove the process makes a conforming part',
+   change:'The first part or assembly from a new or changed process is fully inspected against its definition, including parts bought from suppliers.',
+   body:rows([['Trigger','new part, process, supplier or design change','mu'],['Scope','every characteristic against the definition','mu'],['Record','linked to the configuration in PLM','mu'],['Suppliers','deliver FAI for bought parts','am']]),
+   on:['QMS','PLM'],n:['acc'],e:[],
+   hand:'FAI records in QMS are linked to the part and its configuration.'},
+  {k:'Delivery conformity',state:'As Attested',title:'As Specified against As Built',
+   change:'What was specified is compared with what was built. Any deviation is visible and has a recorded disposition.',
+   body:table(['Item','As Specified','As Built','Status'],[['Wingtip device','Option A','Option A','<span class="tag ok">match</span>'],['Software','Release X','Release X','<span class="tag ok">match</span>'],['Fastener, op 40','Definition','Concession','<span class="tag am">dispositioned</span>']]),
+   on:['PLM','QMS'],n:['acc','conf'],e:['e4'],
+   hand:'The conformity record joins the PLM configuration with the MOM and QMS as-built data.'},
+  {k:'Certification & delivery',state:'As Attested',title:'Deliver to the customer',
+   change:'Compliance data and the conformity record travel with the wing. The customer accepts it. This is the OUT arrow in the Overview.',
+   body:rows([['Compliance data','supports the customer’s certification','mu'],['Delivery documents','conformity and as-built record','mu'],['Acceptance','by the customer'],['Shipment','planned and recorded in ERP','th']])+'<button class="btn pri go" data-go="views" data-view="4">Continue to the Service view →</button>',
+   on:['ERP','QMS','PLM'],n:['conf','cust'],e:['e5'],
+   hand:'The delivered wing keeps its serial identity and as-built record into Service.'}
+ ]},
+ /* 5 Service */
+ {hint:'The wing in service, and what it teaches Design.',
+  map:snake([['cust','Customer','in service','cust'],['sbom','sBOM','HW + SW view'],['plan','Maint. plan','tasks, intervals'],['rec','MRO records','per serial'],['spare','Spare parts','retrofit kits'],['fb','Design','feedback','fb']],'CLOSING THE LOOP'),
+  steps:[
+  {k:'Entry into service',state:'As Maintained',title:'The wing enters service',
+   change:'The delivered wing enters service on the customer’s aircraft with its serial identity and as-built record.',
+   body:rows([['Serial number','linked to the as-built record','th'],['Configuration','as delivered'],['Technical publications','delivered to the customer','mu'],['Support','agreed with the customer','mu']]),
+   on:['PLM','MRO / GMAO'],n:['cust'],e:[],
+   hand:'The as-built configuration becomes the starting as-maintained configuration.'},
+  {k:'sBOM',state:'As Maintained',title:'A structure for support',
+   change:'The structure is reorganised for maintenance: replaceable units, inspection zones, repairable items, and the software view of every loadable part.',
+   body:'<ul class="tree"><li><b>Wing</b><span class="tag">sBOM · service view</span><ul><li>Inspection zones</li><li>Line replaceable units<ul><li>Actuators</li><li>Fuel pumps</li><li>Harness sections</li></ul></li><li>Structural repair items</li><li>Consumables</li><li>Software view<span class="tag">loadable parts</span><ul><li>Flight control software<span class="tag">version per unit</span></li><li>Fuel management software<span class="tag">version per unit</span></li></ul></li></ul></li></ul>',
+   on:['PLM','MRO / GMAO'],n:['cust','sbom'],e:['e1'],
+   hand:'The sBOM, hardware and software, is derived from the same configuration in PLM and used in MRO.'},
+  {k:'Maintenance plan',state:'As Maintained',title:'Tasks and intervals',
+   change:'Maintenance tasks and intervals come from design, safety and supplier data.',
+   body:table(['Task','Interval','Source'],[['Zonal inspection','Interval, example','Maintenance programme'],['Actuator check','Interval, example','Supplier data'],['Rib attachment inspection','Interval, example','Fatigue analysis']]),
+   on:['MRO / GMAO','PLM'],n:['sbom','plan'],e:['e2'],
+   hand:'Tasks are linked to sBOM items, so a design change shows which tasks it affects.'},
+  {k:'Records per serial',state:'As Maintained',title:'Everything recorded against the serial',
+   change:'Every task, finding and replaced part is recorded against the wing serial number. The as-maintained configuration stays current.',
+   body:rows([['Inspection','recorded'],['Finding: wear at a rib fitting','reported','am'],['Part replaced','serial in, serial out'],['Software update','version in, version out','th'],['Configuration','as maintained, updated']]),
+   on:['MRO / GMAO'],n:['plan','rec'],e:['e3'],
+   hand:'MRO keeps the as-maintained record. Recurring findings become visible across the fleet.'},
+  {k:'Spare parts & feedback',state:'As Maintained',title:'Spares out, lessons back',
+   change:'Spare parts and retrofit kits are supplied against the sBOM. Recurring findings return to Requirements and Design.',
+   body:rows([['Spare parts','ordered against the sBOM'],['Retrofit kits','defined by an ECN','th'],['Software updates','released by ECN or service bulletin','th'],['Recurring finding','feedback to Design','am']])+'<button class="btn pri go" data-go="change" data-origin="service">Raise an ECR from this finding →</button>',
+   on:['MRO / GMAO','ERP','PLM'],n:['rec','spare','fb'],e:['e4','e5'],
+   hand:'This closes the loop: as-maintained data returns to Requirements and Design.'}
+ ]}
+];
+var SYS=[['PLM','Product, Digital Mfg'],['ALM / SW','Requirements, software'],['ERP','Demand, procurement, orders'],['MOM','Execution, IIoT'],['QMS','Quality records'],['MRO / GMAO','Maintenance, spares']];
+function fmap(m,s){
+  var h='<svg class="fmap" viewBox="0 0 344 228" role="img" aria-label="Flow for this step">';
+  m.E.forEach(function(e){h+='<path class="fe'+(s.e.indexOf(e[0])>=0?' on':'')+'" d="'+e[1]+'"/>'});
+  m.N.forEach(function(n){
+    var on=s.n.indexOf(n[0])>=0,x=n[1],y=n[2],w=n[3],c=x+w/2;
+    h+='<g class="fn'+(n[6]?' '+n[6]:'')+(on?' on':'')+'"><rect x="'+x+'" y="'+y+'" width="'+w+'" height="40" rx="8"/>'+
+       '<text x="'+c+'" y="'+(y+17)+'" text-anchor="middle">'+n[4]+'</text><text class="s" x="'+c+'" y="'+(y+31)+'" text-anchor="middle">'+n[5]+'</text></g>';
+  });
+  if(m.cap)h+='<text class="fcap" x="'+m.cap[0]+'" y="'+m.cap[1]+'" text-anchor="middle">'+m.cap[2]+'</text>';
+  return h+'</svg>';
+}
+var curView=0,step=0,prT=null;
+function renderVsel(){
+  $('#vsel').innerHTML=STAGES.map(function(st,i){
+    return '<button class="vb" role="tab" aria-selected="'+(i===curView?'true':'false')+'" data-v="'+i+'"><b>0'+(i+1)+'</b><span>'+st.name+'</span><small>'+st.states+'</small></button>';
+  }).join('');
+}
+function renderRibbon(){
+  var h='';
+  VIEWS[curView].steps.forEach(function(s,i){
+    if(i)h+='<span class="rsep">→</span>';
+    h+='<button class="rb'+(i===step?' on':(i<step?' past':''))+'" data-step="'+i+'">'+s.k+'</button>';
+  });
+  $('#ribbon').innerHTML=h;
+}
+function renderStep(anim){
+  var V=VIEWS[curView],s=V.steps[step];
+  renderVsel();renderRibbon();
+  $('#vhint').textContent=V.hint;
+  $('#pr-main').innerHTML='<div class="'+(anim?'swap':'')+'"><div class="state">'+s.state.toUpperCase()+'</div><h2>'+s.title+'</h2><p class="change">'+s.change+'</p>'+s.body+'</div>';
+  $('#pr-side').innerHTML='<h3>Flow</h3>'+fmap(V.map,s)+
+   '<h3>Systems involved</h3><div class="sys">'+SYS.map(function(x){return '<div class="sb'+(s.on.indexOf(x[0])>=0?' on':'')+'">'+x[0]+'<small>'+x[1]+'</small></div>'}).join('')+'</div>'+
+   '<h3>Handoff</h3><p class="handoff">'+s.hand+'</p>'+
+   '<p class="hint" style="margin-top:14px">Illustrative structure and data. Part names are generic placeholders.</p>';
+}
+function stopPr(){if(prT){clearInterval(prT);prT=null}var b=$('#pr-play');if(b)b.textContent='Play the sequence'}
+function playPr(){
+  if(prT){stopPr();return}
+  step=0;renderStep(true);$('#pr-play').textContent='Pause';
+  prT=setInterval(function(){
+    if(step>=VIEWS[curView].steps.length-1){stopPr();return}
+    step++;renderStep(true);
+  },2800);
+}
+$('#ribbon').addEventListener('click',function(e){var b=e.target.closest('[data-step]');if(b){stopPr();step=+b.getAttribute('data-step');renderStep(true)}});
+$('#vsel').addEventListener('click',function(e){var b=e.target.closest('[data-v]');if(b){stopPr();curView=+b.getAttribute('data-v');step=0;renderStep(true)}});
+$('#pr-play').addEventListener('click',playPr);
+renderStep(false);
+
+/* ---------- scene 3: Product Change Management ---------- */
+var PHASES=['ECR raised','Impact analysis','ECO · Program governance','ECN by effectivity','Closed'];
+var ORIG={
+ service:{idx:4,
+  trigger:'Maintenance records show recurring wear on a fitting at a rib attachment.',
+  impact:['Check the requirement is still met. List the variants and serial ranges affected.','Rework the fitting. Update the eBOM, DMU and stress analysis.','Update the mBOM and BOP for parts and assembly. Adjust tooling and supplier orders.','Re-qualify the change. Repeat first article inspection.','Revise the maintenance task. Define a retrofit kit (sBOM).'],
+  effs:['Retrofit plan for wings in service','Cut-in at a serial number','New baseline for future wings']},
+ production:{idx:2,
+  trigger:'A nonconformance repeats across several wings, at the parts plant, a supplier or the assembly facility.',
+  impact:['Confirm the specification and tolerances are still achievable.','Review tolerance and detail design. Update the eBOM if the design changes.','Correct the process: part or assembly BOP, tooling, work instructions, supplier requirements.','Adjust inspection and acceptance criteria. Repeat first article inspection.','Query the as-built records of delivered wings built under the same condition.'],
+  effs:['Query as-built records, then assess','Corrected process from a serial number','New baseline for future wings']},
+ customer:{idx:0,
+  trigger:'The customer changes a requirement for a later delivery batch.',
+  impact:['Update the requirement baseline and the cBOM (150%). Add a variant or option.','Design for the new requirement. Update the eBOM. Revisit make-or-buy.','New mBOM for the affected serials. Update part and assembly BOP and supplier orders.','New test and certification evidence for the changed configuration.','New sBOM and maintenance plan for the changed configuration.'],
+  effs:['Unchanged','New configuration for the affected batch','New baseline for later batches']}
+};
+var origin='service',phase=0,chT=null;
+function caption(){
+  var o=ORIG[origin];
+  return [
+   'Choose where the change starts, then step through it. A change in any view touches all the others.',
+   o.trigger+' An ECR records the problem and the configuration items it touches.',
+   'Impact analysis follows the thread to every view. Each owner sees what changes in their own objects.',
+   'The ECO decision passes the Program governance gate before anything is released.',
+   'The ECN applies the approved change by effectivity, so each wing gets the right configuration.',
+   'One change, one traceable record across all five views. The baseline is updated and the loop is closed.'
+  ][phase];
+}
+function cellState(i,o){
+  var cls='',d=0;
+  if(phase>=1&&i===o.idx)cls='origin';
+  if(phase>=2){cls=(i===o.idx?'origin':'hit');d=(phase===2)?Math.abs(i-o.idx)*260:0}
+  if(phase>=4)cls='done';
+  if(reduce)d=0;
+  return {cls:cls,d:d};
+}
+function renderChange(){
+  var o=ORIG[origin];
+  $('#phases').innerHTML=PHASES.map(function(p,i){
+    var c=(phase===i+1)?' act':(phase>i+1?' dn':'');
+    return (i?'<span class="rsep">→</span>':'')+'<span class="ph'+c+'">'+(i+1)+' '+p+'</span>';
+  }).join('');
+  $('#caption').textContent=caption();
+  var strip=$('#strip');
+  strip.classList.toggle('go',phase===2&&!reduce);
+  strip.innerHTML=STAGES.map(function(st,i){
+    var c=cellState(i,o);
+    return '<div class="sd'+(c.cls?' '+c.cls:'')+'" style="--d:'+c.d+'ms"><i></i><b></b><b></b><b></b></div>';
+  }).join('');
+  $('#rail').innerHTML=STAGES.map(function(st,i){
+    var c=cellState(i,o),txt=st.area,chip='';
+    if(c.cls==='origin'&&phase===1){txt='Change raised here.';chip='ECR raised'}
+    if(phase>=2){txt=o.impact[i];chip='Impacted'}
+    if(phase===3)chip='Awaiting ECO';
+    if(phase>=4)chip='Updated';
+    return '<div class="vc'+(c.cls?' '+c.cls:'')+'" style="--d:'+c.d+'ms"><div class="vno">0'+(i+1)+'</div><h4>'+st.name+'</h4><div class="vs">'+st.states+'</div><p>'+txt+'</p><span class="chip2">'+chip+'</span></div>';
+  }).join('');
+  $('#gov').classList.toggle('on',phase===3);
+  var e=$('#eff');
+  e.classList.toggle('dim',phase<4);
+  e.innerHTML=o.effs.map(function(t,i){return '<div><b>'+['Already delivered','In production','Future wings'][i]+'</b>'+t+'</div>'}).join('');
+}
+function syncOrigin(){$$('.org').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-origin')===origin?'true':'false')})}
+function stopCh(){if(chT){clearInterval(chT);chT=null}var b=$('#ch-run');if(b)b.textContent='Run'}
+function chNext(){if(phase<5){phase++;renderChange()}else stopCh()}
+function runCh(){
+  if(chT){stopCh();return}
+  if(phase>=5)phase=0;
+  $('#ch-run').textContent='Pause';
+  chNext();
+  chT=setInterval(function(){if(phase>=5){stopCh();return}chNext()},2800);
+}
+$$('.org').forEach(function(b){b.addEventListener('click',function(){stopCh();origin=b.getAttribute('data-origin');phase=0;syncOrigin();renderChange()})});
+$('#ch-step').addEventListener('click',function(){stopCh();if(phase>=5)phase=0;else phase++;renderChange()});
+$('#ch-run').addEventListener('click',runCh);
+$('#ch-reset').addEventListener('click',function(){stopCh();phase=0;renderChange()});
+renderChange();
+
+/* ---------- presenter mode ---------- */
+var SEQ=[];
+STAGES.forEach(function(s,i){SEQ.push({s:'overview',i:i})});
+VIEWS.forEach(function(V,v){V.steps.forEach(function(x,k){SEQ.push({s:'views',v:v,k:k})})});
+for(var pp=0;pp<=5;pp++)SEQ.push({s:'change',p:pp});
+var pos=0,presenting=false;
+function applySeq(){
+  var it=SEQ[pos];
+  if(it.s==='overview'){nav('overview');sel(it.i);}
+  else if(it.s==='views'){nav('views');curView=it.v;step=it.k;renderStep(true);}
+  else{nav('change');origin='service';phase=it.p;syncOrigin();renderChange();}
+  window.scrollTo(0,0);
+  $('#pcount').textContent=(pos+1)+' / '+SEQ.length;
+}
+function startPresent(){
+  presenting=true;pos=0;document.body.classList.add('present');
+  try{if(document.activeElement)document.activeElement.blur()}catch(e){}
+  try{var d=document.documentElement;if(d.requestFullscreen){var r=d.requestFullscreen();if(r&&r.catch)r.catch(function(){})}}catch(e){}
+  applySeq();
+}
+function endPresent(){
+  presenting=false;document.body.classList.remove('present');
+  try{if(document.fullscreenElement)document.exitFullscreen()}catch(e){}
+}
+$('#present').addEventListener('click',startPresent);
+$('#pexit').addEventListener('click',endPresent);
+document.addEventListener('keydown',function(e){
+  if(!presenting)return;
+  var k=e.key;
+  if(k==='ArrowRight'||k==='PageDown'||k===' '){e.preventDefault();if(pos<SEQ.length-1){pos++;applySeq()}}
+  else if(k==='ArrowLeft'||k==='PageUp'){e.preventDefault();if(pos>0){pos--;applySeq()}}
+  else if(k==='Escape'){endPresent()}
+});
+document.addEventListener('fullscreenchange',function(){if(!document.fullscreenElement&&presenting)endPresent()});
+
+/* ---------- start ---------- */
+go(location.hash.replace('#',''));
+})();
+</script>
+</body>
+</html>
